@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="mnw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ကြက္ကဒိန်မန်</title>
+    <style>
+        /* CSS Styling */
+        @import url('https://fonts.googleapis.com/css2?family=Padauk:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Padauk', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .calendar-container {
+            background: white;
+            width: 95%;
+            max-width: 500px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #d32f2f, #b71c1c);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 1.4rem;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            background-color: #eee;
+            gap: 1px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .day-name {
+            background-color: #fff;
+            padding: 10px 0;
+            text-align: center;
+            font-weight: bold;
+            color: #555;
+            font-size: 0.85rem;
+        }
+
+        .calendar-body {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            background-color: #eee; /* Grid lines color */
+            gap: 1px;
+        }
+
+        .date-cell {
+            background-color: white;
+            min-height: 70px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .date-cell:hover {
+            background-color: #fff8e1;
+        }
+
+        .gregorian-date {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .mon-date {
+            font-size: 0.75rem;
+            color: #d32f2f; /* Mon Red */
+            text-align: right;
+            font-weight: normal;
+        }
+
+        .full-moon {
+            color: #fbc02d; /* Gold for Full Moon */
+            font-weight: bold;
+        }
+
+        .today {
+            background-color: #ffe0b2;
+            border: 2px solid #ff9800;
+        }
+        
+        .empty-cell {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+
+<div class="calendar-container">
+    <div class="header">
+        <button class="btn" onclick="changeMonth(-1)">&#10094;</button>
+        <h2 id="monthYear"></h2>
+        <button class="btn" onclick="changeMonth(1)">&#10095;</button>
+    </div>
+    
+    <div class="days-grid" id="weekDays">
+        </div>
+
+    <div class="calendar-body" id="calendarDays">
+        </div>
+</div>
+
+<script>
+    // --- Mon Calendar Data ---
+    const monMonths = [
+        "ပြာသိုဝ်", "မာ်", "ဖဝ်ရဂိုန်", "စဲ", "ပသာ်", "ဇှ်ေ", 
+        "ါတ်", "ခ္ဍဲသဳ", "ဘတ်", "ဝဟ်", "ကထိုန်", "မြေက္ကသိုဝ်"
+    ];
+
+    const weekDaysMon = ["အဒိုက်", "စန်", "အၚာ", "ဗုဒ္ဓ", "ဗြဴ", "သိုက်", "သ္ၚိသဝ်"];
+
+    let currentDate = new Date();
+
+    // --- Helper: Simple Moon Phase Calculator ---
+    // Note: This is an approximation based on a known New Moon reference.
+    // Reference New Moon: January 11, 2024
+    function getMonDayString(date) {
+        const knownNewMoon = new Date('2024-01-11T11:57:00'); // Reference date
+        const cycleLength = 29.53059; // Lunar cycle in days
+        
+        const diffTime = date.getTime() - knownNewMoon.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+        
+        const currentCycleDay = diffDays % cycleLength;
+        let dayAge = Math.floor(currentCycleDay); 
+
+        // Adjust for negative dates if looking at past
+        if (dayAge < 0) dayAge += 29;
+
+        // Logic for Waxing (မံက်) / Waning (စွေက်)
+        // 0-14 = Waxing, 15 = Full Moon, 16-29 = Waning
+        
+        if (dayAge < 15) {
+            return `${dayAge + 1} မံက်`;
+        } else if (dayAge === 15) {
+            return `ပေၚ်`;
+        } else if (dayAge < 29) {
+            return `${dayAge - 14} စွေက်`;
+        } else {
+            return `အိုတ်`;
+        }
+    }
+
+    // --- Main Render Function ---
+    function renderCalendar() {
+        const monthYearEl = document.getElementById("monthYear");
+        const calendarDaysEl = document.getElementById("calendarDays");
+        const weekDaysEl = document.getElementById("weekDays");
+
+        // 1. Render Week Header (Only once ideally, but simple here)
+        weekDaysEl.innerHTML = "";
+        weekDaysMon.forEach(day => {
+            const div = document.createElement("div");
+            div.classList.add("day-name");
+            div.innerText = day;
+            weekDaysEl.appendChild(div);
+        });
+
+        calendarDaysEl.innerHTML = "";
+
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+
+        // Title: Gregorian Month & Year
+        const options = { month: 'long', year: 'numeric' };
+        monthYearEl.innerText = currentDate.toLocaleDateString('en-US', options);
+
+        // Calculate Days
+        const firstDayIndex = new Date(year, month, 1).getDay();
+        const lastDay = new Date(year, month + 1, 0).getDate();
+
+        // Empty cells for previous month days
+        for (let i = 0; i < firstDayIndex; i++) {
+            const emptyDiv = document.createElement("div");
+            emptyDiv.classList.add("empty-cell");
+            calendarDaysEl.appendChild(emptyDiv);
+        }
+
+        // Fill Dates
+        for (let i = 1; i <= lastDay; i++) {
+            const dateDiv = document.createElement("div");
+            dateDiv.classList.add("date-cell");
+            
+            // Check Today
+            const loopDate = new Date(year, month, i);
+            const today = new Date();
+            if (i === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+                dateDiv.classList.add("today");
+            }
+
+            // Gregorian Number
+            const gregSpan = document.createElement("span");
+            gregSpan.classList.add("gregorian-date");
+            gregSpan.innerText = i;
+
+            // Mon Date Calculation
+            const monText = getMonDayString(loopDate);
+            const monSpan = document.createElement("span");
+            monSpan.classList.add("mon-date");
+            
+            // Special styling for Full Moon
+            if (monText === "ပေၚ်") {
+                monSpan.classList.add("full-moon");
+                monSpan.innerHTML = "🌕 ပေၚ်";
+            } else if (monText === "အိုတ်") {
+                monSpan.innerHTML = "🌑 အိုတ်";
+            } else {
+                monSpan.innerText = monText;
+            }
+
+            dateDiv.appendChild(gregSpan);
+            dateDiv.appendChild(monSpan);
+            calendarDaysEl.appendChild(dateDiv);
+        }
+    }
+
+    function changeMonth(step) {
+        currentDate.setMonth(currentDate.getMonth() + step);
+        renderCalendar();
+    }
+
+    // Start
+    renderCalendar();
+</script>
+
+</body>
+</html>
